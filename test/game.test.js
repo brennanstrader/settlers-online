@@ -417,7 +417,7 @@ test('state is JSON round-trippable', () => {
 });
 
 test('lobby rules: duplicate name, min players, host only start, room full', () => {
-  const g = new Game();
+  const g = new Game({ minPlayers: 3 });
   g.addPlayer('A', 'x'); g.addPlayer('B', 'y');
   assert.throws(() => g.addPlayer('a', 'z'), /taken/);
   assert.equal(g.act(0, { type: 'start' }).ok, false);
@@ -425,6 +425,7 @@ test('lobby rules: duplicate name, min players, host only start, room full', () 
   assert.throws(() => g.addPlayer('E', 'q'), /full/);
   assert.equal(g.act(1, { type: 'start' }).ok, false);
   assert.ok(g.act(0, { type: 'start' }).ok);
+  const g2 = new Game(); g2.addPlayer('A','x'); g2.addPlayer('B','y'); assert.ok(g2.act(0, { type: 'start' }).ok);
 });
 
 test('full simulated games finish with invariants intact (3 and 4 players)', () => {
