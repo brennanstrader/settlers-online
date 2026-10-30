@@ -209,6 +209,9 @@ function boardSVG() {
   // roads
   for (const [eid, owner] of Object.entries(S.roads)) {
     const e = B.edges[eid]; const [ax, ay] = P(e.a), [bx, by] = P(e.b); const c = S.players[owner].color;
+    if (ASSETS.ok) {
+      s += `<line x1="${ax}" y1="${ay + 3.5}" x2="${bx}" y2="${by + 3.5}" stroke="#000" stroke-opacity=".5" stroke-width="10" stroke-linecap="round" filter="url(#blur2)"/><line x1="${ax}" y1="${ay + 1.4}" x2="${bx}" y2="${by + 1.4}" stroke="${c}" stroke-width="9" stroke-linecap="round"/><line x1="${ax}" y1="${ay + 1.4}" x2="${bx}" y2="${by + 1.4}" stroke="#000" stroke-opacity=".5" stroke-width="9" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${c}" stroke-width="8" stroke-linecap="round"/><line x1="${ax}" y1="${ay - 1.6}" x2="${bx}" y2="${by - 1.6}" stroke="#fff" stroke-opacity=".42" stroke-width="2.4" stroke-linecap="round"/>`;
+    } else
     s += `<line x1="${ax}" y1="${ay + 3}" x2="${bx}" y2="${by + 3}" stroke="#000" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#101216" stroke-width="12.5" stroke-linecap="round"/><line x1="${ax}" y1="${ay + 1.2}" x2="${bx}" y2="${by + 1.2}" stroke="${c}" stroke-width="8.4" stroke-linecap="round"/><line x1="${ax}" y1="${ay + 1.2}" x2="${bx}" y2="${by + 1.2}" stroke="#000" stroke-opacity=".28" stroke-width="8.4" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${c}" stroke-width="7.2" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-opacity=".38" stroke-width="2.2" stroke-linecap="round" transform="translate(-.8,-1.7)"/>`;
   }
   // legal edges
@@ -222,6 +225,8 @@ function boardSVG() {
   const lit = (pts, o) => `<polygon points="${pts}" fill="#fff" opacity="${o}"/>`;
   for (const [vid, b] of Object.entries(S.buildings)) {
     const [x, y] = P(vid); const c = S.players[b.owner].color;
+    const pimg = pieceSVG(b.type, x, y + 3, c);
+    if (pimg) { s += pimg; continue; }
     if (b.type === 'settlement') {
       const front = '-10,9 -10,-1 2,-1 2,9', side = '2,9 2,-1 10,-4 10,6', gable = '-11,-1 -4,-11 3,-1', roofR = '-4,-11 4,-14 11,-4 3,-1';
       s += `<g transform="translate(${x},${y - 3}) scale(1.22)"><ellipse cx="3" cy="11" rx="15" ry="4" fill="#000" opacity=".5"/>` +

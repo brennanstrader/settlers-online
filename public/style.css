@@ -140,10 +140,10 @@ button.next{min-width:136px;font-size:19px;padding:0 18px;border-radius:14px;dis
 .sea{position:absolute;inset:0;overflow:hidden;display:none;background:#06182f;z-index:0}
 .art3d .sea{display:block}
 .sea>div{position:absolute;pointer-events:none;will-change:transform,opacity}
-.sea-img{inset:-5%;background:url(assets/ocean.webp) center/cover;animation:seaDrift 34s ease-in-out infinite alternate}
+.sea-img{inset:-5%;background:url(assets/ocean4.webp) center/cover;animation:seaDrift 34s ease-in-out infinite alternate}
 .sea-w{left:0;top:0;width:calc(100% + 1100px);height:calc(100% + 1100px)}
-.sea-w1{background:url(assets/waves1.webp) 0 0/512px 512px;opacity:.2;animation:wdrift1 48s linear infinite,wbreathe 11s ease-in-out infinite alternate}
-.sea-w2{background:url(assets/waves2.webp) 0 0/768px 768px;opacity:.14;animation:wdrift2 66s linear infinite,wbreathe 15s ease-in-out -6s infinite alternate}
+.sea-w1{background:url(assets/waves1.webp) 0 0/512px 512px;opacity:.12;animation:wdrift1 48s linear infinite,wbreathe 11s ease-in-out infinite alternate}
+.sea-w2{background:url(assets/waves2.webp) 0 0/768px 768px;opacity:.09;animation:wdrift2 66s linear infinite,wbreathe 15s ease-in-out -6s infinite alternate}
 .sea-shine{inset:-40%;background:linear-gradient(112deg,transparent 42%,#a5d8ff26 50%,transparent 58%);animation:shine 24s ease-in-out infinite alternate}
 @keyframes seaDrift{from{transform:scale(1.02) translate3d(-1.6%,-1.1%,0) rotate(-.5deg)}to{transform:scale(1.07) translate3d(1.6%,1.2%,0) rotate(.5deg)}}
 @keyframes wdrift1{from{transform:translate3d(0,0,0)}to{transform:translate3d(-512px,-512px,0)}}
@@ -151,11 +151,11 @@ button.next{min-width:136px;font-size:19px;padding:0 18px;border-radius:14px;dis
 @keyframes wbreathe{from{opacity:.09}to{opacity:.26}}
 @keyframes shine{from{transform:translate3d(-14%,0,0);opacity:.35}to{transform:translate3d(14%,0,0);opacity:1}}
 .foam{position:absolute;inset:0;width:100%;height:100%;opacity:0;will-change:transform,opacity;transform-origin:50% 50%}
-.foam0{opacity:.5;animation:foamBreath 7s ease-in-out infinite alternate}
+.foam0{opacity:.2;animation:foamBreath 7s ease-in-out infinite alternate}
 .foam1{animation:foamLap 10s ease-out infinite}
 .foam2{animation:foamLap 10s ease-out -5s infinite}
-@keyframes foamBreath{from{opacity:.3;transform:scale(1)}to{opacity:.62;transform:scale(1.012)}}
-@keyframes foamLap{0%{transform:scale(1);opacity:0}18%{opacity:.5}100%{transform:scale(1.05);opacity:0}}
+@keyframes foamBreath{from{opacity:.1;transform:scale(1)}to{opacity:.24;transform:scale(1.012)}}
+@keyframes foamLap{0%{transform:scale(1);opacity:0}18%{opacity:.22}100%{transform:scale(1.05);opacity:0}}
 @media (prefers-reduced-motion:reduce){
   .sea>div,.foam{animation:none!important}
   .foam1,.foam2{display:none}

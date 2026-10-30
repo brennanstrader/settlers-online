@@ -30,10 +30,14 @@ const ICONS = (() => {
 })();
 // ---- painted assets (generated 3-D art). Procedural SVG above/below is the fallback if any asset fails to load.
 const ASSETS = { ok: false };
-const ICON_IMG = { lumber: 'ic_lumber.webp', brick: 'ic_brick.webp', wool: 'ic_wool.webp', grain: 'ic_grain.webp', ore: 'ic_ore.webp' };
-const TILE_IMG = { forest: 'tile_forest.webp', pasture: 'tile_pasture.webp', fields: 'tile_fields.webp', hills: 'tile_hills.webp', mountains: 'tile_mountains.webp', desert: 'tile_desert.webp' };
+const ICON_IMG = { lumber: 'i4_lumber.webp', brick: 'i4_brick.webp', wool: 'i4_wool.webp', grain: 'i4_grain.webp', ore: 'i4_ore.webp' };
+// CGI-rendered hex tiles (raised cream bevel baked in); two variants where available, picked per tile
+const TILE_VARIANTS = { forest: ['t4_forest1.webp', 't4_forest2.webp'], pasture: ['t4_pasture1.webp', 't4_pasture2.webp'], fields: ['t4_fields1.webp', 't4_fields2.webp'], hills: ['t4_hills1.webp', 't4_hills2.webp'], mountains: ['t4_mountains1.webp', 't4_mountains2.webp'], desert: ['t4_desert1.webp'] };
+const PIECE_COLORS = { '#e74c3c': 'red', '#3498db': 'blue', '#f39c12': 'orange', '#9b59b6': 'purple' };
+const _PIECE_FILES = Object.values(PIECE_COLORS).flatMap((c) => ['p_house_' + c + '.webp', 'p_city_' + c + '.webp']);
+const _DIE_FILES = [1, 2, 3, 4, 5, 6].map((i) => 'die' + i + '.webp');
 function loadAssets(cb) {
-  const urls = [...Object.values(TILE_IMG), ...Object.values(ICON_IMG), 'ocean.webp', 'waves1.webp', 'waves2.webp'];
+  const urls = [...Object.values(TILE_VARIANTS).flat(), ...Object.values(ICON_IMG), ..._PIECE_FILES, ..._DIE_FILES, 'token.webp', 'plank.webp', 'ocean4.webp', 'waves1.webp', 'waves2.webp'];
   let left = urls.length, bad = false;
   urls.forEach((u) => {
     const i = new Image();
@@ -41,6 +45,13 @@ function loadAssets(cb) {
     i.onerror = () => { bad = true; };
     i.src = 'assets/' + u;
   });
+}
+// CGI settlement / city sprite anchored with its foot on (x, y); '' when unavailable (caller falls back to the vector piece)
+function pieceSVG(type, x, y, color) {
+  const c = PIECE_COLORS[(color || '').toLowerCase()];
+  if (!ASSETS.ok || !c) return '';
+  const w = type === 'city' ? 38 : 31, h = type === 'city' ? w * 227 / 190 : w * 156 / 150;
+  return `<g class="piece"><ellipse cx="${(x + 2).toFixed(1)}" cy="${(y + 1).toFixed(1)}" rx="${(w * 0.46).toFixed(1)}" ry="${(w * 0.17).toFixed(1)}" fill="#000" opacity=".5" filter="url(#blur2)"/><image href="assets/p_${type === 'city' ? 'city' : 'house'}_${c}.webp" x="${(x - w / 2).toFixed(1)}" y="${(y - h + 4).toFixed(1)}" width="${w}" height="${h.toFixed(1)}"/></g>`;
 }
 const _icSvg = (n, s = 18, cls = '', style = '') => `<svg class="ic ${cls}" ${style ? `style="${style}"` : ''} width="${s}" height="${s}" viewBox="0 0 48 48" aria-hidden="true">${ICONS[n] || ''}</svg>`;
 const ic = (n, s = 18, cls = '', style = '') => (ASSETS.ok && ICON_IMG[n]
@@ -51,6 +62,7 @@ const DEV_ICON = { knight: 'swords', roadbuilding: 'road', yearofplenty: 'gift',
 
 const PIPS = { 1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]], 4: [[-1, -1], [1, -1], [-1, 1], [1, 1]], 5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]], 6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]] };
 function dieSVG(v, s = 46) {
+  if (ASSETS.ok) return `<svg class="die3d" width="${s}" height="${s}" viewBox="0 0 48 48" aria-label="die ${v || ''}">${v >= 1 && v <= 6 ? `<image href="assets/die${v}.webp" width="48" height="48"/>` : '<rect x="3" y="3" width="42" height="42" rx="10" fill="#d9ccb0" opacity=".55"/>'}</svg>`;
   const pips = v ? (PIPS[v] || []).map(([x, y]) => `<circle cx="${23 + x * 10}" cy="${22 + y * 10}" r="4.1" fill="#1d150e"/><circle cx="${22.2 + x * 10}" cy="${21.1 + y * 10}" r="1.5" fill="#fff" opacity=".3"/>`).join('') : '';
   return `<svg class="die3d" width="${s}" height="${s}" viewBox="0 0 48 48" aria-label="die ${v || ''}"><rect x="4" y="9" width="42" height="38" rx="10" fill="#000" opacity=".4"/><rect x="2" y="6" width="42" height="38" rx="10" fill="#a8956a"/><rect x="2" y="2" width="42" height="40" rx="10" fill="url(#dieg)" stroke="#c9b98f" stroke-width="1"/><rect x="4.5" y="4.5" width="37" height="35" rx="8" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.2"/><path d="M8 38q15 4 30 0" stroke="#8a7648" stroke-opacity=".25" stroke-width="3" fill="none"/>${pips}</svg>`;
 }
@@ -206,83 +218,55 @@ function boardStaticProc(B, K, vb, P) {
       const hot = t.number === 6 || t.number === 8; const pips = 6 - Math.abs(7 - t.number); const col = hot ? '#c0281c' : '#2a2118';
       const dots = Array.from({ length: pips }, (_, i) => `<circle cx="${(cx + (i - (pips - 1) / 2) * 3.6).toFixed(1)}" cy="${cy + 20.2}" r="1.15" fill="${col}"/>`).join('');
       s += `<circle cx="${cx}" cy="${cy + 8.5}" r="17.5" fill="#000" opacity=".35"/><circle cx="${cx}" cy="${cy + 7}" r="17" fill="url(#token)" stroke="#8a6d3b" stroke-width="1.6"/><circle cx="${cx}" cy="${cy + 7}" r="14.2" fill="none" stroke="#fff9" stroke-width=".8"/>` +
-        `<text x="${cx}" y="${cy + 12.5}" text-anchor="middle" font-family="Georgia,'Noto Serif',serif" font-size="${hot ? 17 : 16}" font-weight="700" fill="${col}">${t.number}</text>${dots}`;
+        `<text x="${cx}" y="${cy + 12.5}" text-anchor="middle" font-family="Georgia,'Noto Serif',serif" font-size="${hot ? 15.5 : 14.5}" font-weight="700" fill="${col}">${t.number}</text>${dots}`;
     }
   }
   return (_staticCache[key] = s);
 }
 const TILE_ICON_BY_RES = { lumber: 'lumber', brick: 'brick', wool: 'wool', grain: 'grain', ore: 'ore' };
 
-// ------------------------------------------------------------------ painted 3-D board (used when ASSETS.ok)
-const _hexEdgeLights = (pts, lightA, darkA, w) => {
-  // pts: [[x,y]...] polygon; outward normal vs light from top-left decides highlight / shade colour
-  let cx = 0, cy = 0; pts.forEach(([x, y]) => { cx += x; cy += y; }); cx /= pts.length; cy /= pts.length;
-  let out = '';
-  for (let i = 0; i < pts.length; i++) {
-    const [x1, y1] = pts[i], [x2, y2] = pts[(i + 1) % pts.length];
-    const mx = (x1 + x2) / 2 - cx, my = (y1 + y2) / 2 - cy, d = Math.hypot(mx, my) || 1;
-    const lit = (-mx / d) * 0.6 + (-my / d) * 0.8; // dot with direction to light (up-left)
-    const col = lit > 0 ? lightA : darkA, op = Math.min(1, Math.abs(lit) * 1.1);
-    out += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${col}" stroke-opacity="${op.toFixed(2)}" stroke-width="${w}" stroke-linecap="round"/>`;
-  }
-  return out;
-};
-
+// ------------------------------------------------------------------ CGI 3-D board (used when ASSETS.ok)
+// Every tile is a pre-rendered hex with its raised cream bevel, AO and lighting baked in; we only add soft shadows,
+// the (drawn-number-on-rendered-puck) tokens and the ports. No vector detail is painted over the renders.
 function boardStatic3D(B, K, vb, P) {
-  const key = '3d|' + B.tiles.map((t) => t.type[0] + (t.number || 0)).join('') + '|' + B.ports.map((p) => p.type).join(',') + '|' + vb.map(Math.round).join(',');
+  const key = '3d4|' + B.tiles.map((t) => t.type[0] + (t.number || 0)).join('') + '|' + B.ports.map((p) => p.type).join(',') + '|' + vb.map(Math.round).join(',');
   if (_staticCache[key]) return _staticCache[key];
   let cx0 = 0, cy0 = 0; B.tiles.forEach((t) => { cx0 += t.x * K; cy0 += t.y * K; }); cx0 /= B.tiles.length; cy0 /= B.tiles.length;
-  const scaled = (t, f) => t.vertices.map((v) => { const [x, y] = P(v); return [t.x * K + (x - t.x * K) * f, t.y * K + (y - t.y * K) * f]; });
-  const str = (pts) => pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
   const full = (t) => t.vertices.map((v) => P(v).join(',')).join(' ');
-  const fullPts = (t) => t.vertices.map((v) => P(v));
+  const W = Math.sqrt(3) * K, H = 2 * K;
   let s = '';
-  // island drop-shadow + rim (dark outline, sand, light edge)
-  s += `<g filter="url(#blur6)" opacity=".7">${B.tiles.map((t) => `<polygon points="${full(t)}" fill="#000" stroke="#000" stroke-width="30" stroke-linejoin="round" transform="translate(2,9)"/>`).join('')}</g>`;
-  s += B.tiles.map((t) => `<polygon points="${full(t)}" fill="#241d14" stroke="#241d14" stroke-width="27" stroke-linejoin="round"/>`).join('');
-  s += B.tiles.map((t) => `<polygon points="${full(t)}" fill="#6a5d43" stroke="#6a5d43" stroke-width="21" stroke-linejoin="round"/>`).join('');
-  s += B.tiles.map((t) => `<polygon points="${full(t)}" fill="#a79a77" stroke="#a79a77" stroke-width="13" stroke-linejoin="round"/>`).join('');
-  // tiles
-  let clips = '';
+  // soft contact shadow of the whole island on the water
+  s += `<g filter="url(#blur6)" opacity=".62">${B.tiles.map((t) => `<polygon points="${full(t)}" fill="#000" stroke="#000" stroke-width="14" stroke-linejoin="round" transform="translate(3,10)"/>`).join('')}</g>`;
+  s += `<g filter="url(#blur2)" opacity=".55">${B.tiles.map((t) => `<polygon points="${full(t)}" fill="#000" transform="translate(1.5,4.5)"/>`).join('')}</g>`;
+  const used = {};
   for (const t of B.tiles) {
-    const inner = scaled(t, 0.925), r = rngFor(t.id + 3);
-    const fixed = t.type === 'pasture' || t.type === 'desert';
-    const S = fixed ? 110 : 190, ox = fixed ? 0 : (r() - 0.5) * 70, oy = fixed ? 0 : (r() - 0.5) * 70;
-    const flip = t.type !== 'desert' && r() > 0.5 ? -1 : 1;
-    const cx = t.x * K, cy = t.y * K;
-    clips += `<clipPath id="c${t.id}"><polygon points="${str(inner)}"/></clipPath>`;
-    // raised tile: contact shadow, cream bevel, bevel edges
-    s += `<polygon points="${full(t)}" fill="#000" opacity=".4" transform="translate(1.5,3.6)" stroke="#000" stroke-width="1.5" stroke-linejoin="round"/>`;
-    s += `<polygon points="${full(t)}" fill="url(#bevel)" stroke="#6d5d38" stroke-width="1.1" stroke-linejoin="round"/>`;
-    s += _hexEdgeLights(fullPts(t), '#fffbe8', '#7c6a3c', 1.8);
-    // painted art
-    s += `<g clip-path="url(#c${t.id})"><g transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) scale(${flip},1)"><image href="assets/${TILE_IMG[t.type]}" x="${(-S / 2 + ox * flip).toFixed(1)}" y="${(-S / 2 + oy).toFixed(1)}" width="${S}" height="${S}" preserveAspectRatio="none"/></g>`;
-    s += `<polygon points="${full(t)}" fill="url(#shade)"/>`;
-    s += `<polygon points="${str(inner)}" fill="none" stroke="#000" stroke-opacity=".4" stroke-width="5" stroke-linejoin="round"/></g>`;
-    s += _hexEdgeLights(inner, '#1a1408', '#fff6d0', 1.3);
+    const vs = TILE_VARIANTS[t.type] || TILE_VARIANTS.desert;
+    const n = used[t.type] = (used[t.type] || 0) + 1;
+    const f = vs[(n + (rngFor(t.id + 11)() > 0.5 ? 1 : 0) + (n > 2 ? t.id : 0)) % vs.length];
+    s += `<image href="assets/${f}" x="${(t.x * K - W / 2 - 0.2).toFixed(1)}" y="${(t.y * K - H / 2 - 0.2).toFixed(1)}" width="${(W + 0.4).toFixed(1)}" height="${(H + 0.4).toFixed(1)}"/>`;
   }
-  s = `<defs>${clips}</defs>` + s;
-  // ports
+  // ports: rendered wooden planks to a round badge
   for (let i = 0; i < B.ports.length; i++) {
     const p = B.ports[i]; const [ax, ay] = P(p.vertices[0]), [bx, by] = P(p.vertices[1]);
     const mx = (ax + bx) / 2 - cx0, my = (ay + by) / 2 - cy0, dd = Math.hypot(mx, my) || 1;
-    const lx = (ax + bx) / 2 + (mx / dd) * 0.95 * K, ly = (ay + by) / 2 + (my / dd) * 0.95 * K;
-    const plank = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1 + 2}" x2="${x2}" y2="${y2 + 2}" stroke="#000" stroke-opacity=".35" stroke-width="9" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#2a1a0b" stroke-width="8" stroke-linecap="round"/><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#8e6232" stroke-width="5.4" stroke-linecap="round"/><line x1="${x1}" y1="${y1 - 1}" x2="${x2}" y2="${y2 - 1}" stroke="#d3a468" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="5 4"/>`;
-    s += `<g>${plank(ax, ay, lx, ly)}${plank(bx, by, lx, ly)}<circle cx="${lx}" cy="${ly + 4}" r="20.5" fill="#000" opacity=".4"/><circle cx="${lx}" cy="${ly + 2.4}" r="20" fill="#9b814a"/><circle cx="${lx}" cy="${ly}" r="20" fill="url(#badge)" stroke="#8a6d3b" stroke-width="1.8"/><ellipse cx="${lx - 5}" cy="${ly - 10}" rx="9" ry="4.5" fill="#fff" opacity=".35"/>`;
-    if (p.type === 'any') s += `<text x="${lx}" y="${ly - 1}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="15" fill="#3d3220">?</text>`;
-    else s += icG(TILE_ICON_BY_RES[p.type], lx, ly - 4, 20);
-    s += `<text x="${lx}" y="${ly + 12.5}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="10" fill="#4a3a1a">${p.type === 'any' ? '3:1' : '2:1'}</text></g>`;
+    const lx = (ax + bx) / 2 + (mx / dd) * 0.98 * K, ly = (ay + by) / 2 + (my / dd) * 0.98 * K;
+    const plank = (x1, y1, x2, y2) => {
+      const L = Math.hypot(x2 - x1, y2 - y1), ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      return `<g transform="translate(${x1.toFixed(1)},${y1.toFixed(1)}) rotate(${ang.toFixed(1)})"><rect x="0" y="-3" width="${L.toFixed(1)}" height="8" rx="2" fill="#000" opacity=".4" filter="url(#blur2)"/><image href="assets/plank.webp" x="0" y="-4" width="${L.toFixed(1)}" height="8" preserveAspectRatio="xMidYMid slice"/></g>`;
+    };
+    s += `<g>${plank(ax, ay, lx, ly)}${plank(bx, by, lx, ly)}<ellipse cx="${lx}" cy="${ly + 5}" rx="19" ry="15" fill="#000" opacity=".5" filter="url(#blur2)"/><image href="assets/token.webp" x="${lx - 21}" y="${ly - 20.2}" width="42" height="40.4"/>`;
+    if (p.type === 'any') s += `<text x="${lx}" y="${ly + 1}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="12" fill="#3d3220">3:1</text><text x="${lx}" y="${ly + 11}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="7.5" fill="#6b5a38">any</text>`;
+    else s += icG(TILE_ICON_BY_RES[p.type], lx, ly - 5, 20) + `<text x="${lx}" y="${ly + 11.5}" text-anchor="middle" font-family="Georgia,serif" font-weight="700" font-size="10" fill="#3d3220">2:1</text>`;
+    s += '</g>';
   }
-  // number tokens (raised pucks)
+  // number tokens: rendered ivory puck + drawn number
   for (const t of B.tiles) {
     if (!t.number) continue;
     const cx = t.x * K, cy = t.y * K;
     const hot = t.number === 6 || t.number === 8; const pips = 6 - Math.abs(7 - t.number); const col = hot ? '#c0281c' : '#2a2118';
-    const dots = Array.from({ length: pips }, (_, i) => `<circle cx="${(cx + (i - (pips - 1) / 2) * 3.6).toFixed(1)}" cy="${cy + 20.4}" r="1.2" fill="${col}"/>`).join('');
-    s += `<circle cx="${cx}" cy="${cy + 11.5}" r="18.5" fill="#000" opacity=".28"/><circle cx="${cx}" cy="${cy + 10}" r="17.6" fill="#000" opacity=".38"/>` +
-      `<circle cx="${cx}" cy="${cy + 9}" r="17" fill="#a38b55"/><circle cx="${cx}" cy="${cy + 7}" r="17" fill="url(#token)" stroke="#8a6d3b" stroke-width="1.3"/>` +
-      `<circle cx="${cx}" cy="${cy + 7}" r="14.2" fill="none" stroke="url(#tokring)" stroke-width="1.1" opacity=".9"/><ellipse cx="${cx - 5}" cy="${cy - 2.2}" rx="9" ry="4.6" fill="#fff" opacity=".4"/>` +
-      `<text x="${cx}" y="${cy + 12.5}" text-anchor="middle" font-family="Georgia,'Noto Serif',serif" font-size="${hot ? 17 : 16}" font-weight="700" fill="${col}">${t.number}</text>${dots}`;
+    const dots = Array.from({ length: pips }, (_, i) => `<circle cx="${(cx + (i - (pips - 1) / 2) * 3.5).toFixed(1)}" cy="${cy + 7.6}" r="1.05" fill="${col}"/>`).join('');
+    s += `<ellipse cx="${cx + 1.5}" cy="${cy + 6.5}" rx="15" ry="12" fill="#000" opacity=".5" filter="url(#blur2)"/><image href="assets/token.webp" x="${cx - 17}" y="${cy - 17.2}" width="34" height="32.8"/>` +
+      `<text x="${cx}" y="${cy + 3}" text-anchor="middle" font-family="Georgia,'Noto Serif',serif" font-size="${hot ? 15.5 : 14.5}" font-weight="700" fill="${col}">${t.number}</text>${dots}`;
   }
   return (_staticCache[key] = s);
 }
@@ -292,5 +276,5 @@ function foamSVG(B, K, vb, P) {
   const polys = (sw, extra) => B.tiles.map((t) => `<polygon points="${t.vertices.map((v) => P(v).join(',')).join(' ')}" fill="none" stroke="#e8f6ff" stroke-width="${sw}" stroke-linejoin="round" ${extra || ''}/>`).join('');
   const box = vb.map((n) => n.toFixed(1)).join(' ');
   const mk = (cls, inner) => `<svg class="foam ${cls}" viewBox="${box}" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><filter id="fb-${cls}" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="3.2"/></filter></defs><g filter="url(#fb-${cls})">${inner}</g></svg>`;
-  return mk('foam0', polys(30, 'opacity=".4"')) + mk('foam1', polys(40)) + mk('foam2', polys(30, 'stroke-dasharray="46 22 14 30"'));
+  return mk('foam0', polys(14, 'opacity=".5"')) + mk('foam1', polys(18)) + mk('foam2', polys(12, 'stroke-dasharray="46 22 14 30"'));
 }
