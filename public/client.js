@@ -146,7 +146,7 @@ function statusInfo() {
 function renderGame(app) {
   const me = S.you;
   if (!$('#game')) {
-    app.innerHTML = `${DIE_DEFS}<div id="game"><div id="left"><div class="panel banner" id="topbar"></div><div id="boardwrap"></div></div><div id="side"></div></div><div id="modalroot"></div>`;
+    app.innerHTML = `${DIE_DEFS}<div id="game"><div id="left"><div class="panel banner" id="topbar"></div><div id="boardwrap"><div class="sea"><div class="sea-img"></div><div class="sea-w sea-w1"></div><div class="sea-w sea-w2"></div><div class="sea-shine"></div></div><div id="foamhost"></div><div id="boardhost"></div></div></div><div id="side"></div></div><div id="modalroot"></div>`;
     $('#boardwrap').addEventListener('click', onBoardClick);
   }
   const mineTurn = S.phase !== 'ended' && me === S.current;
@@ -156,7 +156,8 @@ function renderGame(app) {
   $('#topbar').innerHTML = `
     <div class="bn-text"><div class="eyebrow">${st.label}</div><div class="status">${st.text}</div></div>
     <div class="dice-wrap"><div class="dice-tray ${dice ? '' : 'dim'}">${dieSVG(dice ? dice[0] : 0)}${dieSVG(dice ? dice[1] : 0)}</div><span class="sum">${dice ? dice[0] + dice[1] : '–'}</span></div>`;
-  $('#boardwrap').innerHTML = `<button class="roomchip" title="Copy invite link" data-a="copy">Room <b>${S.code}</b> ${ic('copy', 13)}</button>` + boardSVG();
+  $('#boardhost').innerHTML = `<button class="roomchip" title="Copy invite link" data-a="copy">Room <b>${S.code}</b> ${ic('copy', 13)}</button>` + boardSVG();
+  updateFoam();
   $('#side').innerHTML = sidePanel();
   $('#modalroot').innerHTML = modalHTML();
   const lg = $('#logbox'); if (lg) lg.scrollTop = lg.scrollHeight;
@@ -177,15 +178,28 @@ function legalSets() {
   }
   return out;
 }
-function boardSVG() {
+function boardGeom() {
   const B = S.board;
   const P = (v) => [B.vertices[v].x * K, B.vertices[v].y * K];
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
   B.vertices.forEach((v) => { minx = Math.min(minx, v.x * K); maxx = Math.max(maxx, v.x * K); miny = Math.min(miny, v.y * K); maxy = Math.max(maxy, v.y * K); });
   const pad = 1.5 * K;
-  let w = maxx - minx + 2 * pad, h = maxy - miny + 2 * pad;
+  const w = maxx - minx + 2 * pad, h = maxy - miny + 2 * pad;
   const side = Math.max(w, h * 1.0);
   const vb = [(minx + maxx) / 2 - side / 2, (miny + maxy) / 2 - h / 2 - (side - h) / 2, side, side];
+  return { B, P, vb };
+}
+let _foamKey = '';
+function updateFoam() {
+  const host = $('#foamhost'); if (!host) return;
+  if (!ASSETS.ok) { if (_foamKey) { host.innerHTML = ''; _foamKey = ''; } return; }
+  const { B, P, vb } = boardGeom();
+  const key = B.tiles.map((t) => t.type[0] + t.id).join('') + vb.map(Math.round).join(',');
+  if (key === _foamKey) return; // keep the DOM (and its running animation) untouched between state updates
+  _foamKey = key; host.innerHTML = foamSVG(B, K, vb, P);
+}
+function boardSVG() {
+  const { B, P, vb } = boardGeom();
   const legal = legalSets();
   let s = `<svg id="board" viewBox="${vb.map((n) => n.toFixed(1)).join(' ')}" xmlns="http://www.w3.org/2000/svg">${oceanDefs()}`;
   s += boardStatic(B, K, vb, P);
@@ -195,18 +209,31 @@ function boardSVG() {
   // roads
   for (const [eid, owner] of Object.entries(S.roads)) {
     const e = B.edges[eid]; const [ax, ay] = P(e.a), [bx, by] = P(e.b); const c = S.players[owner].color;
-    s += `<line x1="${ax}" y1="${ay + 2}" x2="${bx}" y2="${by + 2}" stroke="#000" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#101216" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${c}" stroke-width="8" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-opacity=".28" stroke-width="2.4" stroke-linecap="round" transform="translate(-1,-1.4)"/>`;
+    s += `<line x1="${ax}" y1="${ay + 3}" x2="${bx}" y2="${by + 3}" stroke="#000" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#101216" stroke-width="12.5" stroke-linecap="round"/><line x1="${ax}" y1="${ay + 1.2}" x2="${bx}" y2="${by + 1.2}" stroke="${c}" stroke-width="8.4" stroke-linecap="round"/><line x1="${ax}" y1="${ay + 1.2}" x2="${bx}" y2="${by + 1.2}" stroke="#000" stroke-opacity=".28" stroke-width="8.4" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${c}" stroke-width="7.2" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-opacity=".38" stroke-width="2.2" stroke-linecap="round" transform="translate(-.8,-1.7)"/>`;
   }
   // legal edges
   for (const eid of legal.e) {
     const e = B.edges[eid]; const [ax, ay] = P(e.a), [bx, by] = P(e.b);
     s += `<line class="pulse" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-width="10" stroke-linecap="round"/><line class="hit" data-e="${eid}" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="transparent" stroke-width="26" stroke-linecap="round"/>`;
   }
-  // buildings
+  // buildings (shaded 3-D house / town hall)
+  const poly = (pts, fill, extra = '') => `<polygon points="${pts}" fill="${fill}" stroke="#0b0d10" stroke-width="1.5" stroke-linejoin="round" ${extra}/>`;
+  const shd = (pts, o) => `<polygon points="${pts}" fill="#000" opacity="${o}"/>`;
+  const lit = (pts, o) => `<polygon points="${pts}" fill="#fff" opacity="${o}"/>`;
   for (const [vid, b] of Object.entries(S.buildings)) {
     const [x, y] = P(vid); const c = S.players[b.owner].color;
-    if (b.type === 'settlement') s += `<g transform="translate(${x},${y})"><ellipse cx="0" cy="11" rx="12" ry="3.4" fill="#0007"/><path d="M-10,9 L-10,-2 L0,-12 L10,-2 L10,9 Z" fill="${c}" stroke="#0b0d10" stroke-width="2.4" stroke-linejoin="round"/><path d="M-10,-2 L0,-12 L0,9 L-10,9 Z" fill="#fff" opacity=".2"/><path d="M-10,-2 L0,-12 L10,-2" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/></g>`;
-    else s += `<g transform="translate(${x},${y})"><ellipse cx="0" cy="12" rx="16" ry="3.6" fill="#0007"/><path d="M-15,10 L-15,-3 L-5,-3 L-5,-10 L3,-17 L11,-10 L11,-3 L15,-3 L15,10 Z" fill="${c}" stroke="#0b0d10" stroke-width="2.4" stroke-linejoin="round"/><path d="M-15,-3 L-5,-3 L-5,-10 L3,-17 L3,10 L-15,10 Z" fill="#fff" opacity=".2"/><path d="M-5,-10 L3,-17 L11,-10" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/></g>`;
+    if (b.type === 'settlement') {
+      const front = '-10,9 -10,-1 2,-1 2,9', side = '2,9 2,-1 10,-4 10,6', gable = '-11,-1 -4,-11 3,-1', roofR = '-4,-11 4,-14 11,-4 3,-1';
+      s += `<g transform="translate(${x},${y - 3}) scale(1.22)"><ellipse cx="3" cy="11" rx="15" ry="4" fill="#000" opacity=".5"/>` +
+        poly(front, c) + lit(front, 0.1) + poly(side, c) + shd(side, 0.32) + poly(roofR, c) + shd(roofR, 0.12) + poly(gable, c) + lit(gable, 0.26) +
+        `<rect x="-6" y="3" width="5" height="6" rx="1" fill="#000" opacity=".55"/><rect x="-7.5" y="-5.5" width="3.4" height="3.2" fill="#fff" opacity=".35"/><path d="M-10,-1 H2 M2,-1 L10,-4" stroke="#fff" stroke-opacity=".5" stroke-width="1" fill="none"/></g>`;
+    } else {
+      const hall = '-17,10 -17,0 -2,0 -2,10', hroof = '-18.5,0 -9.5,-9 -0.5,0', tf = '-2,10 -2,-8 10,-8 10,10', ts = '10,10 10,-8 16,-11 16,7', tg = '-3,-8 4,-19 11,-8', tr = '4,-19 10,-22 17,-11 11,-8';
+      s += `<g transform="translate(${x + 1},${y - 4}) scale(1.18)"><ellipse cx="2" cy="12" rx="20" ry="4.4" fill="#000" opacity=".5"/>` +
+        poly(hall, c) + lit(hall, 0.08) + poly(hroof, c) + lit(hroof, 0.24) +
+        poly(tf, c) + lit(tf, 0.1) + poly(ts, c) + shd(ts, 0.32) + poly(tr, c) + shd(tr, 0.12) + poly(tg, c) + lit(tg, 0.26) +
+        `<rect x="1.5" y="3.6" width="4.4" height="6.4" rx="1" fill="#000" opacity=".55"/><rect x="-13" y="3" width="4" height="4" fill="#fff" opacity=".3"/><rect x="2.5" y="-5" width="3.4" height="3.4" fill="#fff" opacity=".35"/></g>`;
+    }
   }
   for (const vid of legal.v) {
     const [x, y] = P(vid);
@@ -404,3 +431,4 @@ function onClick(ev) {
 
 document.addEventListener('click', onClick);
 render();
+loadAssets(() => { if (S && $('#game')) render(); });
