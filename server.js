@@ -8,7 +8,7 @@ const { Server } = require('socket.io');
 const { Game } = require('./game');
 
 const PORT = process.env.PORT != null && process.env.PORT !== '' ? +process.env.PORT : 3457;
-const MIN_PLAYERS = +process.env.MIN_PLAYERS || 3;
+const MIN_PLAYERS = +process.env.MIN_PLAYERS || 2;
 const DATA_FILE = process.env.DATA_FILE || path.join(__dirname, 'data', 'rooms.json');
 
 const app = express();

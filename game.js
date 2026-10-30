@@ -101,7 +101,7 @@ function generateBoard(rng = Math.random) {
 class Game {
   constructor(opts = {}) {
     this.rng = opts.rng || Math.random;
-    this.minPlayers = opts.minPlayers || 3;
+    this.minPlayers = opts.minPlayers || 2;
     this.maxPlayers = 4;
     this.phase = 'lobby'; // lobby | setup | playing | ended
     this.host = null;
