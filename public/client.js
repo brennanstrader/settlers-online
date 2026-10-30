@@ -1,15 +1,11 @@
 'use strict';
 const RES = ['lumber', 'brick', 'wool', 'grain', 'ore'];
-const RI = { lumber: ['🪵', 'Lumber'], brick: ['🧱', 'Brick'], wool: ['🐑', 'Wool'], grain: ['🌾', 'Grain'], ore: ['🪨', 'Ore'] };
+const RI = { lumber: ['', 'Lumber'], brick: ['', 'Brick'], wool: ['', 'Wool'], grain: ['', 'Grain'], ore: ['', 'Ore'] };
 const COSTS = {
   road: { lumber: 1, brick: 1 }, settlement: { lumber: 1, brick: 1, wool: 1, grain: 1 },
   city: { grain: 2, ore: 3 }, dev: { wool: 1, grain: 1, ore: 1 },
 };
-const TILE = {
-  forest: ['#2f7d3a', '🌲'], hills: ['#c4602d', '🧱'], pasture: ['#9ccf5b', '🐑'],
-  fields: ['#e8c63c', '🌾'], mountains: ['#8190a0', '🪨'], desert: ['#e6d79c', '🏜️'],
-};
-const DEVN = { knight: ['⚔️', 'Knight'], roadbuilding: ['🛣️', 'Road Building'], yearofplenty: ['🎁', 'Year of Plenty'], monopoly: ['💰', 'Monopoly'], vp: ['⭐', 'Victory Point'] };
+const DEVN = { knight: ['', 'Knight'], roadbuilding: ['', 'Road Building'], yearofplenty: ['', 'Year of Plenty'], monopoly: ['', 'Monopoly'], vp: ['', 'Victory Point'] };
 const K = 52;
 
 const socket = io();
@@ -55,7 +51,7 @@ socket.on('disconnect', () => toast('Disconnected… reconnecting'));
 function maybeToast(prev, st) {
   if (st.lastSteal && (!prev.lastSteal || prev.version !== st.version) && st.lastSteal.thief === st.you) {
     const l = st.log[st.log.length - 1];
-    if (l && /stole/.test(l.msg)) toast(`You stole 1 ${RI[st.lastSteal.res][0]} ${st.lastSteal.res}`);
+    if (l && /stole/.test(l.msg)) toast(`You stole 1 ${st.lastSteal.res}`);
   }
 }
 
@@ -72,7 +68,7 @@ function renderHome(app) {
   const code = (params.get('room') || '').toUpperCase();
   const lastName = localStorage.getItem('so_name') || '';
   app.innerHTML = `<div class="center stack">
-    <div class="title">🏝️ Settlers Online</div>
+    <div class="title">${ic('island', 38)}<span>Settlers Online</span></div>
     <div class="mute">A multiplayer island-building board game for 3–4 players. Create a room and share the code with your friends.</div>
     <div class="card stack">
       <label>Your name<input id="name" maxlength="16" placeholder="Name" value="${esc(lastName)}"></label>
@@ -102,11 +98,11 @@ function renderLobby(app) {
   const isHost = S.players[S.you] && S.players[S.you].name === S.host;
   const n = S.players.length;
   app.innerHTML = `<div class="center stack">
-    <div class="title">🏝️ Settlers Online</div>
+    <div class="title">${ic('island', 38)}<span>Settlers Online</span></div>
     <div class="card stack">
       <div class="mute">Room code — share this with your friends</div>
       <div><span class="code" id="codebox">${S.code}</span></div>
-      <div class="row"><button id="copy">📋 Copy invite link</button>${navigator.share ? '<button id="share">Share…</button>' : ''}</div>
+      <div class="row"><button id="copy">${ic('copy', 16)} Copy invite link</button>${navigator.share ? '<button id="share">Share…</button>' : ''}</div>
     </div>
     <div class="card">
       <h3>Players (${n}/4)</h3>
@@ -124,41 +120,43 @@ function renderLobby(app) {
   $('#leave').onclick = () => { act({ type: 'leave' }); saveSess(null); S = null; render(); };
 }
 
-function statusText() {
+function statusInfo() {
   const cur = S.players[S.current];
   const me = S.you === S.current;
-  if (S.phase === 'ended') return `🏆 ${esc(S.players[S.winner].name)} wins!`;
+  if (S.phase === 'ended') return { label: 'Game over', text: `${esc(S.players[S.winner].name)} wins!` };
   if (S.phase === 'setup') {
-    const what = S.setup.step === 'settlement' ? 'place a settlement' : 'place a road next to it';
-    return me ? `Your turn: ${what}` : `${esc(cur.name)} must ${what}`;
+    const what = S.setup.step === 'settlement' ? 'Place a settlement.' : 'Place a road next to it.';
+    return me ? { label: 'Your turn', text: what } : { label: 'Setup', text: `${esc(cur.name)} is placing a ${S.setup.step === 'settlement' ? 'settlement' : 'road'}.` };
   }
   const t = S.turn;
-  if (t.freeRoads > 0) return me ? `Road Building: place ${t.freeRoads} free road${t.freeRoads > 1 ? 's' : ''}` : `${esc(cur.name)} is placing free roads`;
+  const L = me ? 'Your turn' : 'Waiting';
+  if (t.freeRoads > 0) return me ? { label: L, text: `Place ${t.freeRoads} free road${t.freeRoads > 1 ? 's' : ''}.` } : { label: L, text: `${esc(cur.name)} is placing free roads.` };
   switch (t.phase) {
-    case 'roll': return me ? 'Your turn: roll the dice' : `${esc(cur.name)} is about to roll`;
+    case 'roll': return me ? { label: L, text: 'Roll the dice.' } : { label: L, text: `${esc(cur.name)} is about to roll.` };
     case 'discard': {
       const names = Object.keys(t.discard).map((i) => S.players[i].name);
-      return t.discard[S.you] ? `Seven! Discard ${t.discard[S.you]} cards` : `Waiting for ${esc(names.join(', '))} to discard`;
+      return t.discard[S.you] ? { label: 'Seven!', text: `Discard ${t.discard[S.you]} cards.` } : { label: 'Seven!', text: `Waiting for ${esc(names.join(', '))} to discard.` };
     }
-    case 'robber': return me ? 'Move the robber: tap a tile' : `${esc(cur.name)} is moving the robber`;
-    case 'steal': return me ? 'Choose a player to steal from' : `${esc(cur.name)} is choosing who to rob`;
-    default: return me ? 'Your turn: build, trade, or end turn' : `${esc(cur.name)}'s turn`;
+    case 'robber': return me ? { label: L, text: 'Move the robber: tap a tile.' } : { label: L, text: `${esc(cur.name)} is moving the robber.` };
+    case 'steal': return me ? { label: L, text: 'Choose a player to steal from.' } : { label: L, text: `${esc(cur.name)} is choosing who to rob.` };
+    default: return me ? { label: L, text: 'Build, trade, or end turn.' } : { label: L, text: `${esc(cur.name)}'s turn.` };
   }
 }
 
 function renderGame(app) {
   const me = S.you;
   if (!$('#game')) {
-    app.innerHTML = `<div id="game"><div id="left"><div class="topbar" id="topbar"></div><div id="boardwrap"></div></div><div id="side"></div></div><div id="modalroot"></div>`;
+    app.innerHTML = `${DIE_DEFS}<div id="game"><div id="left"><div class="panel banner" id="topbar"></div><div id="boardwrap"></div></div><div id="side"></div></div><div id="modalroot"></div>`;
     $('#boardwrap').addEventListener('click', onBoardClick);
   }
   const mineTurn = S.phase !== 'ended' && me === S.current;
   const dice = S.turn && S.turn.dice;
+  const st = statusInfo();
+  $('#topbar').className = 'panel banner' + (mineTurn ? ' mine' : '');
   $('#topbar').innerHTML = `
-    <div class="status ${mineTurn ? 'mine' : ''}">${statusText()}</div>
-    ${dice ? `<div class="dice"><div class="die">${dice[0]}</div><div class="die">${dice[1]}</div></div><span class="chip">${dice[0] + dice[1]}</span>` : ''}
-    <span class="chip" title="Share this code" data-a="copy">Room <b>${S.code}</b> 📋</span>`;
-  $('#boardwrap').innerHTML = boardSVG();
+    <div class="bn-text"><div class="eyebrow">${st.label}</div><div class="status">${st.text}</div></div>
+    <div class="dice-wrap"><div class="dice-tray ${dice ? '' : 'dim'}">${dieSVG(dice ? dice[0] : 0)}${dieSVG(dice ? dice[1] : 0)}</div><span class="sum">${dice ? dice[0] + dice[1] : '–'}</span></div>`;
+  $('#boardwrap').innerHTML = `<button class="roomchip" title="Copy invite link" data-a="copy">Room <b>${S.code}</b> ${ic('copy', 13)}</button>` + boardSVG();
   $('#side').innerHTML = sidePanel();
   $('#modalroot').innerHTML = modalHTML();
   const lg = $('#logbox'); if (lg) lg.scrollTop = lg.scrollHeight;
@@ -184,40 +182,20 @@ function boardSVG() {
   const P = (v) => [B.vertices[v].x * K, B.vertices[v].y * K];
   let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
   B.vertices.forEach((v) => { minx = Math.min(minx, v.x * K); maxx = Math.max(maxx, v.x * K); miny = Math.min(miny, v.y * K); maxy = Math.max(maxy, v.y * K); });
-  const pad = 1.55 * K;
-  const vb = [minx - pad, miny - pad, maxx - minx + 2 * pad, maxy - miny + 2 * pad];
+  const pad = 1.5 * K;
+  let w = maxx - minx + 2 * pad, h = maxy - miny + 2 * pad;
+  const side = Math.max(w, h * 1.0);
+  const vb = [(minx + maxx) / 2 - side / 2, (miny + maxy) / 2 - h / 2 - (side - h) / 2, side, side];
   const legal = legalSets();
-  let s = `<svg id="board" viewBox="${vb.join(' ')}" xmlns="http://www.w3.org/2000/svg">`;
-  // ports
-  for (const p of B.ports) {
-    const [ax, ay] = P(p.vertices[0]), [bx, by] = P(p.vertices[1]);
-    const mx = (ax + bx) / 2, my = (ay + by) / 2, d = Math.hypot(mx, my) || 1;
-    const lx = mx + (mx / d) * 0.95 * K, ly = my + (my / d) * 0.95 * K;
-    const label = p.type === 'any' ? ['❔', '3:1'] : [RI[p.type][0], '2:1'];
-    s += `<g><line x1="${ax}" y1="${ay}" x2="${lx}" y2="${ly}" stroke="#d9c9a3" stroke-width="3"/><line x1="${bx}" y1="${by}" x2="${lx}" y2="${ly}" stroke="#d9c9a3" stroke-width="3"/>
-      <circle cx="${lx}" cy="${ly}" r="19" fill="#f5ecd2" stroke="#8a6d3b" stroke-width="2"/>
-      <text x="${lx}" y="${ly - 2}" text-anchor="middle" font-size="13">${label[0]}</text><text x="${lx}" y="${ly + 12}" text-anchor="middle" font-size="11" font-weight="700" fill="#4a3a1a">${label[1]}</text></g>`;
-  }
-  // tiles
-  for (const t of B.tiles) {
-    const pts = t.vertices.map((v) => P(v).join(',')).join(' ');
-    const cx = t.x * K, cy = t.y * K;
-    const [col, ic] = TILE[t.type];
-    s += `<polygon points="${pts}" fill="${col}" stroke="#f3e9c6" stroke-width="3" stroke-linejoin="round"/>`;
-    s += `<text x="${cx}" y="${cy - 18}" text-anchor="middle" font-size="22">${ic}</text>`;
-    if (t.number) {
-      const hot = t.number === 6 || t.number === 8;
-      const pips = 6 - Math.abs(7 - t.number);
-      s += `<circle cx="${cx}" cy="${cy + 10}" r="16" fill="#f7efd6" stroke="#8a6d3b" stroke-width="1.5"/>
-        <text x="${cx}" y="${cy + 14}" text-anchor="middle" font-size="${hot ? 17 : 15}" font-weight="800" fill="${hot ? '#c0281c' : '#222'}">${t.number}</text>
-        <text x="${cx}" y="${cy + 22}" text-anchor="middle" font-size="7" fill="${hot ? '#c0281c' : '#222'}">${'•'.repeat(pips)}</text>`;
-    }
-    if (S.robber === t.id) s += `<g transform="translate(${cx + 24},${cy + 14})"><ellipse cx="0" cy="12" rx="10" ry="5" fill="#0006"/><path d="M-9,12 Q-9,-4 0,-4 Q9,-4 9,12 Z" fill="#222" stroke="#fff" stroke-width="1.5"/><circle cx="0" cy="-9" r="6" fill="#222" stroke="#fff" stroke-width="1.5"/></g>`;
-  }
+  let s = `<svg id="board" viewBox="${vb.map((n) => n.toFixed(1)).join(' ')}" xmlns="http://www.w3.org/2000/svg">${oceanDefs()}`;
+  s += boardStatic(B, K, vb, P);
+  // robber
+  const rt = B.tiles[S.robber];
+  if (rt) { const cx = rt.x * K, cy = rt.y * K; s += `<g transform="translate(${cx + 24},${cy + 16})"><ellipse cx="0" cy="12" rx="11" ry="4.5" fill="#0007"/><path d="M-9,12 Q-9,-3 0,-3 Q9,-3 9,12 Z" fill="#17181c" stroke="#e8e2d2" stroke-width="1.2"/><circle cx="0" cy="-9" r="6" fill="#17181c" stroke="#e8e2d2" stroke-width="1.2"/><path d="M-5-10q1-4 4-4" stroke="#7d8696" stroke-width="1.4" fill="none" stroke-linecap="round"/></g>`; }
   // roads
   for (const [eid, owner] of Object.entries(S.roads)) {
-    const e = B.edges[eid]; const [ax, ay] = P(e.a), [bx, by] = P(e.b);
-    s += `<line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#111" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${S.players[owner].color}" stroke-width="8" stroke-linecap="round"/>`;
+    const e = B.edges[eid]; const [ax, ay] = P(e.a), [bx, by] = P(e.b); const c = S.players[owner].color;
+    s += `<line x1="${ax}" y1="${ay + 2}" x2="${bx}" y2="${by + 2}" stroke="#000" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#101216" stroke-width="12" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="${c}" stroke-width="8" stroke-linecap="round"/><line x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}" stroke="#fff" stroke-opacity=".28" stroke-width="2.4" stroke-linecap="round" transform="translate(-1,-1.4)"/>`;
   }
   // legal edges
   for (const eid of legal.e) {
@@ -227,8 +205,8 @@ function boardSVG() {
   // buildings
   for (const [vid, b] of Object.entries(S.buildings)) {
     const [x, y] = P(vid); const c = S.players[b.owner].color;
-    if (b.type === 'settlement') s += `<path transform="translate(${x},${y})" d="M-10,9 L-10,-2 L0,-11 L10,-2 L10,9 Z" fill="${c}" stroke="#111" stroke-width="2.2" stroke-linejoin="round"/>`;
-    else s += `<path transform="translate(${x},${y})" d="M-14,10 L-14,-2 L-4,-2 L-4,-9 L3,-15 L10,-9 L10,-2 L14,-2 L14,10 Z" fill="${c}" stroke="#111" stroke-width="2.2" stroke-linejoin="round"/>`;
+    if (b.type === 'settlement') s += `<g transform="translate(${x},${y})"><ellipse cx="0" cy="11" rx="12" ry="3.4" fill="#0007"/><path d="M-10,9 L-10,-2 L0,-12 L10,-2 L10,9 Z" fill="${c}" stroke="#0b0d10" stroke-width="2.4" stroke-linejoin="round"/><path d="M-10,-2 L0,-12 L0,9 L-10,9 Z" fill="#fff" opacity=".2"/><path d="M-10,-2 L0,-12 L10,-2" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/></g>`;
+    else s += `<g transform="translate(${x},${y})"><ellipse cx="0" cy="12" rx="16" ry="3.6" fill="#0007"/><path d="M-15,10 L-15,-3 L-5,-3 L-5,-10 L3,-17 L11,-10 L11,-3 L15,-3 L15,10 Z" fill="${c}" stroke="#0b0d10" stroke-width="2.4" stroke-linejoin="round"/><path d="M-15,-3 L-5,-3 L-5,-10 L3,-17 L3,10 L-15,10 Z" fill="#fff" opacity=".2"/><path d="M-5,-10 L3,-17 L11,-10" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.2" stroke-linejoin="round"/></g>`;
   }
   for (const vid of legal.v) {
     const [x, y] = P(vid);
@@ -255,74 +233,73 @@ function onBoardClick(ev) {
 }
 
 // ---- side panel
-function resChips(h, small) { return RES.filter((r) => h[r]).map((r) => `<span class="chip">${RI[r][0]} ${h[r]}</span>`).join(' ') || '<span class="mute">nothing</span>'; }
+function resChips(h, small) { return RES.filter((r) => h[r]).map((r) => `<span class="chip">${ic(r, 14)} ${h[r]}</span>`).join(' ') || '<span class="mute">nothing</span>'; }
+const costRow = (c) => Object.entries(c).map(([r, n]) => ic(r, 14).repeat(n)).join('');
 
 function sidePanel() {
   const me = S.you, mine = S.phase === 'playing' && me === S.current;
   const my = S.me; const t = S.turn;
   let h = '';
   // players
-  h += `<div class="card players">` + S.players.map((p) => `<div class="p ${p.index === S.current && S.phase !== 'ended' ? 'cur' : ''}">
+  h += `<div class="panel players">` + S.players.map((p) => `<div class="p ${p.index === S.current && S.phase !== 'ended' ? 'cur' : ''} ${p.connected ? '' : 'off'}">
       <span class="dot" style="background:${p.color}"></span>
-      <span class="nm">${esc(p.name)}${p.index === me ? ' (you)' : ''}${p.connected ? '' : ' <span class="mute">⚠ offline</span>'}</span>
-      <span title="Resource cards">🂠${p.resCount}</span><span title="Development cards">🃏${p.devCount}</span>
-      <span title="Knights played">⚔️${p.knights}</span><span title="Longest road length">🛣️${p.roadLength}</span>
-      ${p.hasLongest ? '<span title="Longest Road +2">🏅</span>' : ''}${p.hasArmy ? '<span title="Largest Army +2">🎖️</span>' : ''}
+      <span class="nm">${esc(p.name)}${p.index === me ? ' (you)' : ''}${p.connected ? '' : ' <span class="mute">· offline</span>'}${p.hasLongest ? ` <span title="Longest Road +2">${ic('medal', 15)}</span>` : ''}${p.hasArmy ? ` <span title="Largest Army +2">${ic('star', 15)}</span>` : ''}</span>
+      <span class="st" title="Resource cards">${ic('card', 17)}${p.resCount}</span><span class="st" title="Development cards">${ic('devcard', 17)}${p.devCount}</span>
+      <span class="st" title="Knights played">${ic('swords', 17)}${p.knights}</span><span class="st" title="Longest road length">${ic('road', 17)}${p.roadLength}</span>
       <span class="vp" title="Victory points">${p.vp}${p.index === me && p.vp !== p.publicVP ? '*' : ''}</span></div>`).join('') +
-    `<div class="mute" style="font-size:12px">First to 10 VP wins · 🏅 Longest Road (5+) · 🎖️ Largest Army (3+)${S.players[me] && S.players[me].vp !== S.players[me].publicVP ? ' · * includes hidden VP cards' : ''}</div></div>`;
+    `<div class="rules"><span>First to 10 VP wins</span><i></i><span>${ic('medal', 16)} Longest Road (5+)</span><i></i><span>${ic('star', 16)} Largest Army (3+)</span></div>${S.players[me] && S.players[me].vp !== S.players[me].publicVP ? '<div class="mute small" style="text-align:center;margin-top:4px">* includes hidden VP cards</div>' : ''}</div>`;
 
   if (S.phase === 'ended') {
     const isHost = S.players[me] && S.players[me].name === S.host;
-    h += `<div class="card"><h3>🏆 ${esc(S.players[S.winner].name)} wins!</h3>${S.players.map((p) => `<div>${esc(p.name)}: <b>${p.vp}</b> VP</div>`).join('')}
-      ${isHost ? '<button class="primary" data-a="rematch" style="margin-top:8px">Rematch (back to lobby)</button>' : '<div class="mute">Host can start a rematch.</div>'}</div>`;
-  }
-  if (me >= 0 && my) {
-    h += `<div class="card"><div class="mute" style="margin-bottom:4px">Your hand</div><div class="hand">${RES.map((r) => `<div class="res">${RI[r][0]}<b>${my.resources[r]}</b><span class="mute" style="font-size:11px">${RI[r][1]}</span></div>`).join('')}</div>`;
-    if (my.dev.length) {
-      const grouped = {}; my.dev.forEach((d) => (grouped[d] = (grouped[d] || 0) + 1));
-      h += `<div class="mute" style="margin:8px 0 2px">Development cards</div>`;
-      for (const [d, n] of Object.entries(grouped)) {
-        const canPlay = mine && S.phase === 'playing' && my.playable[d] && !t.devPlayed && (t.phase === 'main' || t.phase === 'roll') && !(t.freeRoads > 0);
-        h += `<div class="dev"><span>${DEVN[d][0]}</span><span class="grow">${DEVN[d][1]} ×${n}</span>${d === 'vp' ? '<span class="mute">auto</span>' : `<button class="sm" data-a="dev" data-k="${d}" ${canPlay ? '' : 'disabled'}>${my.playable[d] ? 'Play' : 'next turn'}</button>`}</div>`;
-      }
-    }
-    h += `</div>`;
+    h += `<div class="panel"><div class="eyebrow">Final scores</div><h3 class="serif big">${ic('trophy', 26)} ${esc(S.players[S.winner].name)} wins!</h3>${S.players.map((p) => `<div class="row" style="padding:3px 0"><span class="dot" style="background:${p.color}"></span><span class="grow">${esc(p.name)}</span><b>${p.vp}</b> VP</div>`).join('')}
+      ${isHost ? '<button class="primary wide" data-a="rematch" style="margin-top:10px">Rematch (back to lobby)</button>' : '<div class="mute">Host can start a rematch.</div>'}</div>`;
   }
   // actions
   if (S.phase === 'playing' && me >= 0) {
     const inMain = mine && t.phase === 'main' && !(t.freeRoads > 0);
     const hand = my.resources, L = S.legal;
     const can = (k) => inMain && hasAll(hand, COSTS[k]);
-    h += `<div class="card stack"><div class="btns">`;
-    if (mine && t.phase === 'roll' && !(t.freeRoads > 0)) h += `<button class="primary" data-a="roll">🎲 Roll dice</button>`;
-    if (inMain) {
-      h += `<button class="primary" data-a="end">End turn</button>`;
-    }
-    h += `</div>`;
-    h += `<div class="btns">
-      <button data-a="mode" data-k="road" class="${mode === 'road' ? 'primary' : ''}" ${can('road') && L.roads.length ? '' : 'disabled'} title="1 lumber + 1 brick">🛣️ Road</button>
-      <button data-a="mode" data-k="settlement" class="${mode === 'settlement' ? 'primary' : ''}" ${can('settlement') && L.settlements.length ? '' : 'disabled'} title="1 lumber, brick, wool, grain">🏠 Settlement</button>
-      <button data-a="mode" data-k="city" class="${mode === 'city' ? 'primary' : ''}" ${can('city') && L.cities.length ? '' : 'disabled'} title="2 grain + 3 ore">🏰 City</button>
-      <button data-a="buy" ${can('dev') && S.deckSize ? '' : 'disabled'} title="1 wool, grain, ore">🃏 Dev card (${S.deckSize})</button>
-      <button data-a="tradeToggle" ${inMain ? '' : 'disabled'}>🤝 Trade</button></div>`;
-    if (mode && inMain) h += `<div class="mute">Tap a highlighted spot on the board to build. <a href="#" data-a="mode" data-k="">cancel</a></div>`;
-    h += `<div class="mute" style="font-size:12px">Costs — Road: 🪵🧱 · Settlement: 🪵🧱🐑🌾 · City: 🌾🌾🪨🪨🪨 · Dev card: 🐑🌾🪨</div></div>`;
+    h += `<div class="panel"><div class="eyebrow">Build &amp; trade</div><div class="abtns">
+      <button data-a="mode" data-k="road" class="${mode === 'road' ? 'on' : ''}" ${can('road') && L.roads.length ? '' : 'disabled'} title="1 lumber + 1 brick">${ic('road', 22)}<span>Road</span></button>
+      <button data-a="mode" data-k="settlement" class="${mode === 'settlement' ? 'on' : ''}" ${can('settlement') && L.settlements.length ? '' : 'disabled'} title="1 lumber, brick, wool, grain">${ic('house', 22)}<span>Settlement</span></button>
+      <button data-a="mode" data-k="city" class="${mode === 'city' ? 'on' : ''}" ${can('city') && L.cities.length ? '' : 'disabled'} title="2 grain + 3 ore">${ic('city', 22)}<span>City</span></button>
+      <button data-a="buy" ${can('dev') && S.deckSize ? '' : 'disabled'} title="1 wool, grain, ore">${ic('devcard', 22)}<span>Dev card <small>(${S.deckSize})</small></span></button>
+      <button data-a="tradeToggle" class="${showTrade ? 'on' : ''}" ${inMain ? '' : 'disabled'}>${ic('trade', 22)}<span>Trade</span></button></div>`;
+    if (mode && inMain) h += `<div class="mute small" style="margin-top:8px">Tap a highlighted spot on the board to build. <a href="#" data-a="mode" data-k="">cancel</a></div>`;
+    h += `<div class="costs"><span>Road ${costRow(COSTS.road)}</span><span>Settlement ${costRow(COSTS.settlement)}</span><span>City ${costRow(COSTS.city)}</span><span>Dev ${costRow(COSTS.dev)}</span></div></div>`;
     if (t.phase === 'steal' && mine) {
-      h += `<div class="card"><b>Steal from:</b><div class="btns" style="margin-top:6px">${S.legal.steal.map((i) => `<button data-a="steal" data-i="${i}"><span class="dot" style="background:${S.players[i].color}"></span> ${esc(S.players[i].name)} (${S.players[i].resCount})</button>`).join('')}</div></div>`;
+      h += `<div class="panel"><div class="eyebrow">Steal from</div><div class="btns" style="margin-top:8px">${S.legal.steal.map((i) => `<button data-a="steal" data-i="${i}"><span class="dot" style="background:${S.players[i].color}"></span> ${esc(S.players[i].name)} (${S.players[i].resCount})</button>`).join('')}</div></div>`;
     }
     if (t.phase === 'discard' && t.discard[me]) h += discardCard(t.discard[me]);
     if (S.trade) h += tradeCard();
     if (showTrade && inMain) h += tradePanel();
   }
-  h += `<div class="card"><div class="mute" style="margin-bottom:4px">Log</div><div class="log" id="logbox">${S.log.map((l) => `<div>${esc(l.msg)}</div>`).join('')}</div></div>`;
-  h += `<div class="mute" style="font-size:12px;text-align:center">Bank: ${RES.map((r) => RI[r][0] + S.bank[r]).join(' ')} · <a href="#" data-a="leavegame" style="color:var(--mute)">Leave</a></div>`;
+  if (me >= 0 && my) {
+    h += `<div class="panel"><div class="eyebrow">Your resources</div><div class="hand">${RES.map((r) => `<div class="res ${my.resources[r] ? '' : 'zero'}">${ic(r, 40)}<b>${my.resources[r]}</b><span>${RI[r][1]}</span></div>`).join('')}</div></div>`;
+    const grouped = {}; my.dev.forEach((d) => (grouped[d] = (grouped[d] || 0) + 1));
+    const pl = S.phase === 'playing';
+    const inMain2 = mine && pl && t.phase === 'main' && !(t.freeRoads > 0);
+    const rollNow = mine && pl && t.phase === 'roll' && !(t.freeRoads > 0);
+    h += `<div class="panel"><div class="eyebrow">Development cards</div><div class="devrow"><div class="devlist">`;
+    const ents = Object.entries(grouped);
+    if (!ents.length) h += `<div class="dev empty">No cards yet</div>`;
+    for (const [d, n] of ents) {
+      const canPlay = mine && pl && my.playable[d] && !t.devPlayed && (t.phase === 'main' || t.phase === 'roll') && !(t.freeRoads > 0);
+      h += `<div class="dev">${ic(DEV_ICON[d], 28)}<span class="grow">${DEVN[d][1]} ×${n}</span>${d === 'vp' ? '<span class="mute tag">auto</span>' : canPlay ? `<button class="sm" data-a="dev" data-k="${d}">Play</button>` : `<span class="mute tag">${my.playable[d] ? '' : 'next turn'}</span>`}</div>`;
+    }
+    h += `</div>`;
+    if (pl) h += rollNow ? `<button class="primary next" data-a="roll">${ic('dice', 22, '', 'color:#2a2118')} Roll Dice</button>` : `<button class="primary next" data-a="end" ${inMain2 ? '' : 'disabled'}>Next Turn <span class="arr">→</span></button>`;
+    h += `</div></div>`;
+  }
+  h += `<div class="panel"><div class="eyebrow">Log</div><div class="log" id="logbox">${S.log.map((l) => `<div>${esc(l.msg)}</div>`).join('')}</div></div>`;
+  h += `<div class="mute small bankline">Bank: ${RES.map((r) => `<span>${ic(r, 14)} ${S.bank[r]}</span>`).join('')} · <a href="#" data-a="leavegame">Leave</a></div>`;
   return h;
 }
 
 function discardCard(need) {
   const sum = RES.reduce((s, r) => s + (discardDraft[r] || 0), 0);
   return `<div class="card offer"><b>Discard ${need} cards</b> <span class="mute">(selected ${sum})</span>
-    ${RES.map((r) => `<div class="trade-row"><span>${RI[r][0]}</span><span class="mute">have ${S.me.resources[r]}</span>
+    ${RES.map((r) => `<div class="trade-row"><span>${ic(r, 24)}</span><span class="mute">have ${S.me.resources[r]}</span>
       <span class="stepper"><button class="sm" data-a="dstep" data-r="${r}" data-d="-1">−</button><span>${discardDraft[r] || 0}</span><button class="sm" data-a="dstep" data-r="${r}" data-d="1">+</button></span></div>`).join('')}
     <button class="primary" data-a="discard" ${sum === need ? '' : 'disabled'}>Discard</button></div>`;
 }
@@ -349,16 +326,16 @@ function tradePanel() {
   let h = `<div class="card"><div class="tabs"><button class="${tab === 'bank' ? 'on' : ''}" data-a="tab" data-k="bank">Bank / Port</button><button class="${tab === 'players' ? 'on' : ''}" data-a="tab" data-k="players">Players</button></div>`;
   if (tab === 'bank') {
     const ratio = my.ratios[bankDraft.give];
-    const opts = (sel) => RES.map((r) => `<option value="${r}" ${r === sel ? 'selected' : ''}>${RI[r][0]} ${RI[r][1]}</option>`).join('');
+    const opts = (sel) => RES.map((r) => `<option value="${r}" ${r === sel ? 'selected' : ''}>${RI[r][1]}</option>`).join('');
     const ok = bankDraft.give !== bankDraft.get && my.resources[bankDraft.give] >= ratio && S.bank[bankDraft.get] > 0;
-    h += `<div class="mute">Your rates: ${RES.map((r) => `${RI[r][0]}${my.ratios[r]}:1`).join(' ')}</div>
+    h += `<div class="mute">Your rates: ${RES.map((r) => `<span class="chip">${ic(r, 14)} ${my.ratios[r]}:1</span>`).join(' ')}</div>
       <div class="row" style="margin:8px 0"><span>Give <b>${ratio}</b></span><select data-sel="give">${opts(bankDraft.give)}</select><span>for 1</span><select data-sel="get">${opts(bankDraft.get)}</select></div>
       <button class="primary" data-a="bank" ${ok ? '' : 'disabled'}>Trade with bank</button>`;
   } else {
     const others = S.players.filter((p) => p.index !== S.you);
     h += `<div class="row" style="margin-bottom:6px"><span>To:</span><select data-sel="to"><option value="">Everyone</option>${others.map((p) => `<option value="${p.index}" ${draft.to === p.index ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
       <div class="trade-row mute"><span></span><span>You give</span><span>You get</span></div>
-      ${RES.map((r) => `<div class="trade-row"><span>${RI[r][0]}</span>
+      ${RES.map((r) => `<div class="trade-row"><span>${ic(r, 24)}</span>
         <span class="stepper"><button class="sm" data-a="tstep" data-s="give" data-r="${r}" data-d="-1">−</button><span>${draft.give[r] || 0}</span><button class="sm" data-a="tstep" data-s="give" data-r="${r}" data-d="1">+</button></span>
         <span class="stepper"><button class="sm" data-a="tstep" data-s="get" data-r="${r}" data-d="-1">−</button><span>${draft.get[r] || 0}</span><button class="sm" data-a="tstep" data-s="get" data-r="${r}" data-d="1">+</button></span></div>`).join('')}
       <button class="primary" data-a="offer" ${S.trade ? 'disabled' : ''}>${S.trade ? 'Cancel your current offer first' : 'Send offer'}</button>`;
@@ -368,11 +345,11 @@ function tradePanel() {
 
 function modalHTML() {
   if (!modal) return '';
-  const opts = (sel, id) => RES.map((r) => `<option value="${r}" ${r === sel ? 'selected' : ''}>${RI[r][0]} ${RI[r][1]}</option>`).join('');
-  if (modal.type === 'yop') return `<div class="modal"><div class="card stack"><h3>🎁 Year of Plenty</h3><div class="mute">Take any 2 resources from the bank.</div>
+  const opts = (sel, id) => RES.map((r) => `<option value="${r}" ${r === sel ? 'selected' : ''}>${RI[r][1]}</option>`).join('');
+  if (modal.type === 'yop') return `<div class="modal"><div class="card stack"><h3 class="serif">${ic('gift', 24)} Year of Plenty</h3><div class="mute">Take any 2 resources from the bank.</div>
     <select data-sel="ya">${opts(modal.a)}</select><select data-sel="yb">${opts(modal.b)}</select>
     <div class="btns"><button class="primary" data-a="yopgo">Take</button><button data-a="closemodal">Cancel</button></div></div></div>`;
-  if (modal.type === 'monopoly') return `<div class="modal"><div class="card stack"><h3>💰 Monopoly</h3><div class="mute">Every other player gives you all their cards of one resource.</div>
+  if (modal.type === 'monopoly') return `<div class="modal"><div class="card stack"><h3 class="serif">${ic('coins', 24)} Monopoly</h3><div class="mute">Every other player gives you all their cards of one resource.</div>
     <select data-sel="mr">${opts(modal.r)}</select>
     <div class="btns"><button class="primary" data-a="monogo">Take them</button><button data-a="closemodal">Cancel</button></div></div></div>`;
   return '';
